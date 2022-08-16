@@ -1,7 +1,6 @@
 import copy
 
 import torch
-import torchvision.models
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
@@ -18,7 +17,7 @@ def generate_interaction(pi, env, max_timestamp=100):
     values = []
     rewards = []
     terminals = []
-    while timestamp < max_timestamp:
+    while len(states) < max_timestamp:
         success = False
         while not success:
             if current_player_turn == 0:
@@ -54,7 +53,7 @@ def generate_interaction(pi, env, max_timestamp=100):
 
 # https://arxiv.org/abs/1506.02438
 # http://incompleteideas.net/book/RLbook2020.pdf#page=309
-def compute_advantage(pi, rewards, values, terminal, gamma=0.1, _lambda=0.3):
+def compute_advantage(rewards, values, terminal, gamma=0.1, _lambda=0.3):
     T = len(rewards)
     advantages = torch.empty((T+1)).cuda()
     deltas = torch.empty(T).cuda()
@@ -70,8 +69,7 @@ def evaluate(pi):
         env = C4Env()
         total_rewards = 0
         total = 100
-        dist = torch.zeros(C4Env.board_size[1])
-        for _ in tqdm(range(total)):
+        for _ in range(total):
             is_ended = False
             while not is_ended:
                 s, p, e = env.get_current_state()
@@ -82,13 +80,11 @@ def evaluate(pi):
 
                 success, _, _, _e = env.interact(a)
                 if success:
-                    if _e:
-                        dist[a] += 1
                     _, s, r, is_ended = env.interact(a, True)
             total_rewards += r
             env.reset()
 
-        print(f'score: {total_rewards/total}, {dist}')
+        print(f'score: {total_rewards/total}')
 
 
 if __name__ == '__main__':
@@ -98,7 +94,6 @@ if __name__ == '__main__':
 
 
     pi = Policy(C4Env.board_size, (C4Env.board_size[1], )).cuda()
-    pi_old = copy.deepcopy(pi)
     adam = torch.optim.Adam(list(pi.parameters()))
 
 
@@ -114,16 +109,15 @@ if __name__ == '__main__':
     for _ in range(N):
         environments.append(C4Env())
 
-    bar = tqdm(range(1000))
-    for iteration in bar:
-        pi_before_update = copy.deepcopy(pi)
+    for iteration in tqdm(range(10000)):
+        pi_old = copy.deepcopy(pi)
 
 
         states, actions, vtargets, advantages = ([], [], [], [])
         for i in range(N):
-            ss, acs, vs, rs, ts = generate_interaction(pi, environments[i], T)
-            vtgs, advs = compute_advantage(pi, rs, vs.detach(), ts)
-            states.append(ss)
+            ss, acs, vs, rs, ts = generate_interaction(pi_old, environments[i], T)
+            vtgs, advs = compute_advantage(rs, vs.detach(), ts)
+            states.append(ss.detach())
             actions.append(acs)
             vtargets.append(vtgs)
             advantages.append(advs)
@@ -151,7 +145,6 @@ if __name__ == '__main__':
 
                 adam.step()
 
-        pi_old = pi_before_update
-        bar.set_description(f'total loss: {total_loss}')
+        print(f'total loss: {total_loss}')
         evaluate(pi)
 
