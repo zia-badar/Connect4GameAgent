@@ -8,10 +8,30 @@ class C4Env():
     def __init__(self):
         self.reset()
 
-    def interact(self, action, step=False):
+    def step(self, action):
+        possible, reward, ended = self.outcome(action)
+
+        if not possible:
+            return False, None, None, None
+
+        self.do_it(action)
+        if not ended:
+            opponent_possible = False
+            while not opponent_possible:
+                action = torch.randint(0, C4Env.board_size[1], (1,)).cuda()
+                opponent_possible, opponent_reward, opponent_ended = self.outcome(action)
+
+            self.do_it(action)
+            ended = opponent_ended
+            reward += opponent_reward
+
+        return True, self.board, reward, ended
+
+
+    def outcome(self, action):
         col = action.item()
         if not(self.top[col] < self.board_size[0]):          # action column is full
-            return False, None, None, None
+            return False, None, None
 
         update_r, update_c = self.top[col], col
         player_indicator = self.player_turn + 1
@@ -34,20 +54,22 @@ class C4Env():
         ended |= draw
         reward = (-1) ** (self.player_turn) if ended and not draw else 0
 
-        if step:
-            self.board = torch.clone(self.board)                # torch autograd requires input not changed for grad computation
-            self.board[update_r, update_c] = player_indicator
-            self.top[update_c] += 1
-            self.player_turn = (self.player_turn + 1) % 2
-            self.ended = ended
+        return True, reward, ended
 
-        return True, self.board, reward, ended
+    def do_it(self, action):
+        col = action.item()
+        update_r, update_c = self.top[col], col
+        player_indicator = self.player_turn + 1
+
+        self.board = torch.clone(self.board)  # torch autograd requires input not changed for grad computation
+        self.board[update_r, update_c] = player_indicator
+        self.top[update_c] += 1
+        self.player_turn = (self.player_turn + 1) % 2
 
     def get_current_state(self):
-        return self.board, self.player_turn, self.ended
+        return self.board
 
     def reset(self):
         self.board = torch.zeros(C4Env.board_size).cuda()
         self.top = [0] * C4Env.board_size[1]
         self.player_turn = 0
-        self.ended = False

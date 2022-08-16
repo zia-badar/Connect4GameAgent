@@ -7,9 +7,9 @@ from tqdm import tqdm
 from environement import C4Env
 from policy import Policy
 
-def generate_interaction(pi, env, max_timestamp=100):
+def generate_interaction(pi, env, horizon, gamma=0.99, _lambda=0.95):
 
-    current_state, current_player_turn, current_ended = env.get_current_state()
+    current_state = env.get_current_state()
 
     timestamp = 0
     states = []
@@ -17,15 +17,11 @@ def generate_interaction(pi, env, max_timestamp=100):
     values = []
     rewards = []
     terminals = []
-    while len(states) < max_timestamp:
+    while len(states) < horizon:
         success = False
         while not success:
-            if current_player_turn == 0:
-                action = pi.act(current_state)
-            else:
-                action = torch.randint(0, C4Env.board_size[1], (1,)).cuda()
-
-            success, _, reward, _ = env.interact(action)
+            action = pi.act(current_state)
+            success, _, reward, ended = env.step(action)
 
         value = pi.value(current_state)
         states.append(current_state)
@@ -33,36 +29,35 @@ def generate_interaction(pi, env, max_timestamp=100):
         values.append(value)
         rewards.append(reward)              # reward belongs to the state from which it was generated as a consequence of performing action.
 
-        _, _, _, current_ended = env.interact(action, True)
-        terminals.append(current_ended)
+        terminals.append(ended)
 
-        if current_ended:
+        if ended:
             env.reset()     # skip terminal state because no action or reward exists for it
 
-        current_state, current_player_turn, _ = env.get_current_state()
+        current_state = env.get_current_state()
         timestamp += 1
 
 
     values.append(pi.value(current_state))
-    states = torch.cat(states).reshape(((max_timestamp, ) + C4Env.board_size))
+    states = torch.cat(states).reshape(((horizon,) + C4Env.board_size))
     actions = torch.cat(actions)
-    values = torch.cat(values).squeeze(-1)
+    values = torch.cat(values).squeeze(-1).detach()
     rewards = torch.tensor(rewards)
-    terminals = torch.tensor(terminals)
-    return states, actions, values, rewards, terminals
 
-# https://arxiv.org/abs/1506.02438
-# http://incompleteideas.net/book/RLbook2020.pdf#page=309
-def compute_advantage(rewards, values, terminal, gamma=0.1, _lambda=0.3):
-    T = len(rewards)
-    advantages = torch.empty((T+1)).cuda()
-    deltas = torch.empty(T).cuda()
+    # https://arxiv.org/abs/1506.02438
+    # http://incompleteideas.net/book/RLbook2020.pdf#page=309
+    terminals = torch.tensor(terminals)
+    advantages = torch.empty((horizon + 1)).cuda()
+    deltas = torch.empty(horizon).cuda()
     advantages[-1] = 0
     for t in reversed(range(T)):
-        deltas[t] = rewards[t] + gamma*values[t+1]*(not terminal[t]) - values[t]
-        advantages[t] = deltas[t] + gamma*_lambda*(advantages[t+1] * (not terminal[t]))
+        deltas[t] = rewards[t] + gamma*values[t+1]*(not terminals[t]) - values[t]
+        advantages[t] = deltas[t] + gamma*_lambda*(advantages[t+1] * (not terminals[t]))
 
-    return values[:-1] + advantages[:-1], advantages[:-1]
+    vtargets = values[:-1] + advantages[:-1]
+    advantages = advantages[:-1]
+
+    return states, actions, vtargets, advantages
 
 def evaluate(pi):
     with torch.no_grad():
@@ -72,15 +67,12 @@ def evaluate(pi):
         for _ in range(total):
             is_ended = False
             while not is_ended:
-                s, p, e = env.get_current_state()
-                if p == 0:
-                    a = pi.act(s)
-                else:
-                    a = torch.randint(0, C4Env.board_size[1], (1,)).cuda()
+                s = env.get_current_state()
+                a = pi.act(s)
 
-                success, _, _, _e = env.interact(a)
+                success, _, r, e = env.step(a)
                 if success:
-                    _, s, r, is_ended = env.interact(a, True)
+                    is_ended = e
             total_rewards += r
             env.reset()
 
@@ -89,20 +81,16 @@ def evaluate(pi):
 
 if __name__ == '__main__':
 
-    batch = 32
-    action_shape = (6,)
-
-
     pi = Policy(C4Env.board_size, (C4Env.board_size[1], )).cuda()
-    adam = torch.optim.Adam(list(pi.parameters()))
+    adam = torch.optim.Adam(list(pi.parameters()), lr=2.5e-4)
 
 
     epsilon = 0.2
     c1 = 0.1
-    c2 = 0.1
-    N = 10      # actors
+    c2 = 0.01
+    N = 8      # actors
     T = 256     # timestamp per actor
-    M = 64      # SGD batch size
+    M = 32      # SGD batch size
     k = 4       # epochs per iteration
 
     environments = []
@@ -115,9 +103,8 @@ if __name__ == '__main__':
 
         states, actions, vtargets, advantages = ([], [], [], [])
         for i in range(N):
-            ss, acs, vs, rs, ts = generate_interaction(pi_old, environments[i], T)
-            vtgs, advs = compute_advantage(rs, vs.detach(), ts)
-            states.append(ss.detach())
+            ss, acs, vtgs, advs = generate_interaction(pi_old, environments[i], T)
+            states.append(ss)
             actions.append(acs)
             vtargets.append(vtgs)
             advantages.append(advs)
