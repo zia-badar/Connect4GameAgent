@@ -81,7 +81,7 @@ def evaluate(pi):
 
 if __name__ == '__main__':
 
-    pi = Policy(C4Env.board_size, (C4Env.board_size[1], )).cuda()
+    pi = Policy().cuda()
     adam = torch.optim.Adam(list(pi.parameters()), lr=2.5e-4)
 
 

@@ -8,10 +8,9 @@ from environement import C4Env
 
 class Policy(nn.Module):           # only support discret single actions
 
-    def __init__(self, state_space, action_space):
+    def __init__(self):
         super(Policy, self).__init__()
-        input_size = torch.prod(torch.tensor([list(state_space)]), 1)
-        output_size = torch.prod(torch.tensor([list(action_space)]), 1)
+        output_size = C4Env.board_size[1]
         self.head = nn.Sequential(
             nn.Conv2d(1, 4, kernel_size=(4, 3), stride=(2, 2)),
             nn.ReLU(),

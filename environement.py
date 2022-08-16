@@ -5,8 +5,9 @@ class C4Env():
     board_size = (10, 10)
     length = 4
 
-    def __init__(self):
+    def __init__(self, rule_based_opponent_step=False):
         self.reset()
+        self.rule_based_opponent_step = rule_based_opponent_step
 
     def step(self, action):
         possible, reward, ended = self.outcome(action)
@@ -15,7 +16,7 @@ class C4Env():
             return False, None, None, None
 
         self.do_it(action)
-        if not ended:
+        if self.rule_based_opponent_step and not ended:
             opponent_possible = False
             while not opponent_possible:
                 action = torch.randint(0, C4Env.board_size[1], (1,)).cuda()
@@ -67,7 +68,7 @@ class C4Env():
         self.player_turn = (self.player_turn + 1) % 2
 
     def get_current_state(self):
-        return self.board
+        return self.board, self.player_turn
 
     def reset(self):
         self.board = torch.zeros(C4Env.board_size).cuda()
