@@ -9,9 +9,8 @@ from policy import Policy
 
 def generate_interaction(pi, env, horizon, gamma=0.99, _lambda=0.95):
 
-    current_state, current_player_turn = env.get_current_state()
+    current_state, _ = env.get_current_state()
 
-    timestamp = 0
     states = []
     actions = []
     values = []
@@ -34,8 +33,7 @@ def generate_interaction(pi, env, horizon, gamma=0.99, _lambda=0.95):
         if ended:
             env.reset()     # skip terminal state because no action or reward exists for it
 
-        current_state, current_player_turn = env.get_current_state()
-        timestamp += 1
+        current_state, _ = env.get_current_state()
 
 
     values.append(pi.value(current_state))

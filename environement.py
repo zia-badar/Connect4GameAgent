@@ -26,7 +26,7 @@ class C4Env():
             ended = opponent_ended
             reward += opponent_reward
 
-        return True, self.board, reward, ended
+        return True, self.board, reward if self.rule_based_opponent_step else abs(reward), ended
 
 
     def outcome(self, action):
