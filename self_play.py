@@ -2,7 +2,6 @@ import copy
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-from tqdm import tqdm
 
 from environement import C4Env
 from policy import Policy
@@ -62,30 +61,35 @@ def generate_interaction(pi_s, env, horizon, gamma=0.99, _lambda=0.95):
     return torch.stack(states), torch.stack(actions), torch.stack(vtargets), torch.stack(advantages)
 
 def evaluate(pi):
+    opponents = list(['random', 'weak_rule_based', 'strong_rule_based'])
+    win_to_loss_ratio = [0, 0, 0]
+
     with torch.no_grad():
-        env = C4Env(rule_based_opponent_step=True)
-        total_rewards = 0
-        total = 100
-        for _ in range(total):
-            is_ended = False
-            while not is_ended:
-                s, _ = env.get_current_state()
-                a = pi.act(s)
+        for i, opponent in enumerate(opponents):
+            env = C4Env(rule_based_opponent_type=opponent)
+            total_wins = 0
+            total = 100
+            for _ in range(total):
+                is_ended = False
+                while not is_ended:
+                    s, _ = env.get_current_state()
+                    a = pi.act(s)
 
-                success, _, r, e = env.step(a)
-                if success:
-                    is_ended = e
-            total_rewards += r
-            env.reset()
+                    success, _, r, e = env.step(a)
+                    if success:
+                        is_ended = e
+                total_wins += (r == 1)
+                total -= (r == 0)       # draw
+                env.reset()
 
-        print(f'score: {total_rewards/total}')
+            win_to_loss_ratio[i] = (total_wins / total)
 
+    return win_to_loss_ratio
 
 if __name__ == '__main__':
 
     pi_s = (Policy().cuda(), Policy().cuda())
     adams = (torch.optim.Adam(list(pi_s[0].parameters()), lr=2.5e-4), torch.optim.Adam(list(pi_s[1].parameters()), lr=2.5e-4) )
-
 
     epsilon = 0.2
     c1 = 0.1
@@ -99,7 +103,7 @@ if __name__ == '__main__':
     for _ in range(N):
         environments.append(C4Env())
 
-    for iteration in tqdm(range(10000)):
+    for iteration in range(10000):
         pi_old_s = (copy.deepcopy(pi_s[0]), copy.deepcopy(pi_s[1]))
 
 
@@ -147,5 +151,5 @@ if __name__ == '__main__':
 
                     _adam.step()
 
-        evaluate(pi_s[0])
+        print(evaluate(pi_s[0]))
 

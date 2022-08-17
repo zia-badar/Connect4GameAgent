@@ -2,7 +2,6 @@ import copy
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-from tqdm import tqdm
 
 from environement import C4Env
 from policy import Policy
@@ -57,10 +56,10 @@ def generate_interaction(pi, env, horizon, gamma=0.99, _lambda=0.95):
 
     return states, actions, vtargets, advantages
 
-def evaluate(pi):
+def evaluate(pi, opponent_type='strong_rule_based'):
     with torch.no_grad():
-        env = C4Env(rule_based_opponent_step=True)
-        total_rewards = 0
+        env = C4Env(rule_based_opponent_type=opponent_type)
+        total_wins = 0
         total = 100
         for _ in range(total):
             is_ended = False
@@ -71,10 +70,11 @@ def evaluate(pi):
                 success, _, r, e = env.step(a)
                 if success:
                     is_ended = e
-            total_rewards += r
+            total_wins += (r == 1)
+            total -= (r == 0)  # draw
             env.reset()
 
-        print(f'score: {total_rewards/total}')
+        return total_wins/total
 
 
 if __name__ == '__main__':
@@ -82,6 +82,7 @@ if __name__ == '__main__':
     pi = Policy().cuda()
     adam = torch.optim.Adam(list(pi.parameters()), lr=2.5e-4)
 
+    opponent_type = 'strong_rule_based'
 
     epsilon = 0.2
     c1 = 0.1
@@ -93,9 +94,10 @@ if __name__ == '__main__':
 
     environments = []
     for _ in range(N):
-        environments.append(C4Env(rule_based_opponent_step=True))
+        environments.append(C4Env(rule_based_opponent_type=opponent_type))
 
-    for iteration in tqdm(range(10000)):
+    evaluations = []
+    for iteration in range(10000):
         pi_old = copy.deepcopy(pi)
 
 
@@ -112,7 +114,6 @@ if __name__ == '__main__':
         dataloader = DataLoader(dataset, batch_size=M, shuffle=True)
 
 
-        total_loss = 0
         for epochs in range(k):
             for states, actions, vtargets, advantages in dataloader:
                 adam.zero_grad()
@@ -126,10 +127,8 @@ if __name__ == '__main__':
 
                 loss = -torch.mean(l_clip - c1*l_vf + c2*entropy)
                 loss.backward()
-                total_loss += loss.item()
 
                 adam.step()
 
-        print(f'total loss: {total_loss}')
-        evaluate(pi)
-
+        evaluations.append(evaluate(pi, opponent_type))
+        print(f'evaluation: {evaluations[-1]}')

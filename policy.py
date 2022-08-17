@@ -1,6 +1,5 @@
 import torch.nn
 from torch import nn
-from torch.nn import Parameter
 from torch.nn.functional import one_hot
 
 from environement import C4Env
@@ -11,13 +10,24 @@ class Policy(nn.Module):           # only support discret single actions
     def __init__(self):
         super(Policy, self).__init__()
         output_size = C4Env.board_size[1]
+        # #simple policy, not works for strong_rule_based agent
+        # self.head = nn.Sequential(
+        #     nn.Conv2d(1, 4, kernel_size=(3, 3), stride=(2, 2)),         # output: 3x3
+        #     nn.ReLU(),
+        #     nn.Conv2d(4, 8, kernel_size=(2, 2), stride=(1, 1)),         # output: 2x2
+        #     nn.ReLU(),
+        #     nn.Flatten(),
+        #     nn.Linear(32, 16)
+        # )
+
+        # for learning against strong rule based agent
         self.head = nn.Sequential(
-            nn.Conv2d(1, 4, kernel_size=(4, 3), stride=(2, 2)),
+            nn.Conv2d(1, 32, kernel_size=(2, 2), stride=(2, 2)),     # output: 4x3
             nn.ReLU(),
-            nn.Conv2d(4, 8, kernel_size=(2, 2), stride=(1, 1)),
+            nn.Conv2d(32, 32, kernel_size=(2, 2), stride=(1, 1)),     # output: 3x2
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(72, 16)
+            nn.Linear(192, 16)
         )
 
         self.action_layer = nn.Linear(16, output_size)
