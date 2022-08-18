@@ -1,4 +1,5 @@
 import copy
+import pickle as pk
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -97,7 +98,7 @@ if __name__ == '__main__':
         environments.append(C4Env(rule_based_opponent_type=opponent_type))
 
     evaluations = []
-    for iteration in range(10000):
+    for iteration in range(1, 10000):
         pi_old = copy.deepcopy(pi)
 
 
@@ -132,3 +133,7 @@ if __name__ == '__main__':
 
         evaluations.append(evaluate(pi, opponent_type))
         print(f'evaluation: {evaluations[-1]}')
+
+        if iteration % 100 == 0:
+            with open(f'evaluation_{opponent_type}', 'wb') as file:
+                pk.dump(evaluations, file, pk.HIGHEST_PROTOCOL)

@@ -1,4 +1,5 @@
 import copy
+import pickle as pk
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
@@ -103,7 +104,8 @@ if __name__ == '__main__':
     for _ in range(N):
         environments.append(C4Env())
 
-    for iteration in range(10000):
+    evaluations = []
+    for iteration in range(1, 10000):
         pi_old_s = (copy.deepcopy(pi_s[0]), copy.deepcopy(pi_s[1]))
 
 
@@ -124,7 +126,6 @@ if __name__ == '__main__':
         dataloader = DataLoader(dataset, batch_size=M, shuffle=True)
 
 
-        total_loss = 0
         for epochs in range(k):
             for states, actions, vtargets, advantages in dataloader:
                 for player_turn in list([0, 1]):
@@ -151,5 +152,9 @@ if __name__ == '__main__':
 
                     _adam.step()
 
-        print(evaluate(pi_s[0]))
+        evaluations.append(evaluate(pi_s[0]))
+        print(f'evaluation: {evaluations[-1]}')
 
+        if iteration % 100 == 0:
+            with open(f'evaluation_selfplay', 'wb') as file:
+                pk.dump(evaluations, file, pk.HIGHEST_PROTOCOL)
