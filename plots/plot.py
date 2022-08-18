@@ -17,6 +17,7 @@ def plot():
     plt.xlabel('iterations')
     plt.ylabel('wins to games played ratio, over 100 games')
     plt.legend()
+    plt.savefig('plots/self_play')
     plt.show()
 
 
@@ -37,6 +38,5 @@ def plot():
     plt.xlabel('iterations')
     plt.ylabel('wins to games played ratio, over 100 games')
     plt.legend()
+    plt.savefig('plots/rule_based')
     plt.show()
-
-    print('')
