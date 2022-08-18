@@ -11,7 +11,7 @@ Result of self play showed the agent was able to learn some rules of the game as
 ## Against rule based opponnet
 <img src="https://i.imgur.com/N76Zg36.png" width="500" >
 <br/>
-Although self playing agent did performed well against weak or strong rule based opponent, It perform well against these opponents when trained directly against these opponents, showing agent is capable of finding vulnerablities in rule base opponents.
+Although self playing agent did not performed well against weak or strong rule based opponent, It perform well against these opponents when trained directly against these opponents, showing agent is capable of finding vulnerablities in rule base opponents.
 
 ## Requirements:
 The program is testing with following dependencies
