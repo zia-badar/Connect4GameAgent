@@ -6,7 +6,7 @@ The agent was tested against three rule based agent random, weak, strong. Random
 ## Self play
 <img src="https://i.imgur.com/sKG4Lgo.png" width="500" >
 <br/>
-Result of self play showed the agent was able to learn some rules of the game as it perform good against random opponnet but against weak and strong opponent it was good enough. Reason could be policy archietecture, exploration holding back(policy entropy) or limitation of algorithm.
+Result of self play showed the agent was able to learn some rules of the game as it perform good against random opponnet but against weak and strong opponent it was not good enough. Reason could be policy archietecture, exploration holding back(policy entropy) or limitation of algorithm.
 
 ## Against rule based opponent
 <img src="https://i.imgur.com/N76Zg36.png" width="500" >
